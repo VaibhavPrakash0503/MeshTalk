@@ -1,0 +1,9 @@
+/build/
+/sdkconfig.old
+/.sdkconfig*
+/.project_description.json
+/Makefile
+CMakeCache.txt
+*.pyc
+*.log
+.cache
