@@ -10,7 +10,7 @@ set(EXTRA_COMPONENT_DIRS
     logic
     mesh
     ui
-    components
+    components/esp-idf-ssd1306/components/ssd1306
     include
 )
 
