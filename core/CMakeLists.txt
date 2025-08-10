@@ -1,8 +1,8 @@
 idf_component_register(
     SRCS
         "display.c"
-        "crc16.c"
     INCLUDE_DIRS
-        "../include"
+        "../include/"
+        "../components/ssd1306"
 )
 
