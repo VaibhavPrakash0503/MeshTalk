@@ -4,14 +4,4 @@ cmake_minimum_required(VERSION 3.16)
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 
-
-set(EXTRA_COMPONENT_DIRS
-    core
-    logic
-    mesh
-    ui
-    components/ssd1306
-    include
-)
-
 project(MeshTalk)
