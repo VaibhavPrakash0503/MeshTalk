@@ -66,7 +66,7 @@ int deserialize_message(const uint8_t *in_buf, size_t in_len,
   idx += msg->payload_len;
 
   uint16_t recv_crc = ((uint16_t)in_buf[idx] << 8) | in_buf[idx + 1];
-  uint16_t calc_crc = crc16_ccitt(in_buf, idx);
+  uint16_t calc_crc = crc16(in_buf, idx);
 
   if (recv_crc != calc_crc)
     return -3; // CRC mismatch
