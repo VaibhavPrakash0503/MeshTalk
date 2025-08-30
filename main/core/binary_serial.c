@@ -2,8 +2,7 @@
 #include "crc16.h"
 #include <string.h>
 
-int serialize_message(const MeshMessage *msg, uint8_t *out_buf,
-                      size_t *out_len) {
+int serialize_message(const MeshMessage *msg, uint8_t *out_buf, size_t *out_len) {
   if (!msg || !out_buf || !out_len)
     return -1;
   if (msg->payload_len > MAX_PAYLOAD_SIZE)
