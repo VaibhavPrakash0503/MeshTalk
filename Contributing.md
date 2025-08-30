@@ -8,8 +8,8 @@ To maintain consistency and quality across the project, please follow the guidel
 
 ## 📁 Project Structure Guidelines
 
-- **Organize code into modules**: All functionality should be structured under `main/`, `core/`, `logic/`, `mesh/`, `ui/`, and `include/`.
-- **Use header files**: All shared functions, macros, and constants must be declared in the `include/` directory.
+- **Organize code into modules**: All functionality should be structured under `main/` and subfolder of main.
+- **Use header files**: All shared functions, macros, and constants must be declared in the `main/headers/` directory.
 - **Driver code**: Keep all hardware-specific logic modular inside the appropriate component folder.
 
 ---
