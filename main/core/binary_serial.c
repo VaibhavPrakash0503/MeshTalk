@@ -1,10 +1,11 @@
 #include "binary_serial.h"
-#include "crc16.h"
 #include <string.h>
 
-int serialize_message(const MeshMessage *msg, uint8_t *out_buf, size_t *out_len) {
+int serialize_message(const MeshMessage *msg, uint8_t *out_buf,
+                      size_t *out_len) {
   if (!msg || !out_buf || !out_len)
     return -1;
+
   if (msg->payload_len > MAX_PAYLOAD_SIZE)
     return -2;
 
@@ -26,11 +27,6 @@ int serialize_message(const MeshMessage *msg, uint8_t *out_buf, size_t *out_len)
 
   memcpy(&out_buf[idx], msg->payload, msg->payload_len);
   idx += msg->payload_len;
-
-  // Append CRC16
-  uint16_t crc = crc16(out_buf, idx);
-  out_buf[idx++] = (crc >> 8) & 0xFF;
-  out_buf[idx++] = crc & 0xFF;
 
   *out_len = idx;
   return 0;
@@ -63,12 +59,6 @@ int deserialize_message(const uint8_t *in_buf, size_t in_len,
 
   memcpy(msg->payload, &in_buf[idx], msg->payload_len);
   idx += msg->payload_len;
-
-  uint16_t recv_crc = ((uint16_t)in_buf[idx] << 8) | in_buf[idx + 1];
-  uint16_t calc_crc = crc16(in_buf, idx);
-
-  if (recv_crc != calc_crc)
-    return -3; // CRC mismatch
 
   return 0;
 }
