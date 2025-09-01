@@ -2,6 +2,8 @@
 #include "app_state.h"
 #include "message_handler.h"
 #include "message_struct.h"
+#include "node_config.h"
+#include "user_table.h"
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -12,10 +14,7 @@ static ui_receive_cb_t ui_cb = NULL;
 /**
  * Initialize API and register UI callback.
  */
-void api_init(ui_receive_cb_t cb) {
-  ui_cb = cb;
-  app_state_init(); // reset logs on startup
-}
+void api_init(ui_receive_cb_t cb) { ui_cb = cb; }
 
 /**
  * Convert plain text to MeshMessage and send via message_handler.
@@ -24,8 +23,8 @@ void api_send_text(uint16_t receiver_id, const char *msg) {
   MeshMessage m;
   memset(&m, 0, sizeof(MeshMessage));
 
-  m.type = 1;      // 1 = text message
-  m.sender_id = 1; // Todo get from config/local table
+  m.type = 1;                 // 1 = text message
+  m.sender_id = NODE_USER_ID; // Todo get from config/local table
   m.receiver_id = receiver_id;
   m.timestamp = (uint64_t)time(NULL);
 
@@ -36,10 +35,9 @@ void api_send_text(uint16_t receiver_id, const char *msg) {
   m.payload_len = msg_len;
   memcpy(m.payload, msg, msg_len);
 
-  message_handler_send(&m);
+  uint16_t receiver_add = get_unicast_addr(receiver_id);
 
-  // Also store the sent message in app_state
-  app_state_add_message(&m);
+  message_handler_send(&m, receiver_add);
 }
 
 /**
@@ -47,8 +45,13 @@ void api_send_text(uint16_t receiver_id, const char *msg) {
  * Converts MeshMessage → (sender_id, text) → UI callback.
  */
 void api_on_message_received(const MeshMessage *m) {
-  // 1. Save to app_state
-  app_state_add_message(m);
+
+  int sender = m->sender_id;
+
+  // Update new message flag if chat with this sender is not open
+  if (g_app_state.selected_user != sender) {
+    g_app_state.new_message_flags[sender] = true;
+  }
 
   // 2. Notify UI if registered
   if (ui_cb) {

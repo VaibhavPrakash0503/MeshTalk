@@ -2,6 +2,7 @@
 #include "binary_serial.h"
 #include "crc16.h"
 #include "mesh.h"
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -70,7 +71,7 @@ int message_handler_process_incoming(const uint8_t *data, size_t len,
  * - Append CRC
  * - Forward to mesh.c
  */
-int message_handler_send(const MeshMessage *msg) {
+int message_handler_send(const MeshMessage *msg, uint16_t receiver_add) {
   if (!msg) {
     return -1;
   }
@@ -90,7 +91,7 @@ int message_handler_send(const MeshMessage *msg) {
   buffer[buffer_len++] = crc & 0xFF;
 
   // Pass to mesh for transport
-  return mesh_send_raw(buffer, buffer_len);
+  return mesh_send_raw(buffer, buffer_len, receiver_add);
 }
 
 /**

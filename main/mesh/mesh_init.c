@@ -1,10 +1,9 @@
 #include "mesh_init.h"
-#include "model_vendor.h"
-
 #include "esp_ble_mesh_common_api.h"
 #include "esp_ble_mesh_networking_api.h"
 #include "esp_ble_mesh_provisioning_api.h"
 #include "esp_log.h"
+#include "model_vendor.h"
 
 static const char *TAG = "MESH_INIT";
 

@@ -17,7 +17,7 @@ void message_handler_init(void);
 /**
  * Send a fully processed MeshMessage
  */
-int message_handler_send(const MeshMessage *msg);
+int message_handler_send(const MeshMessage *msg, uint16_t receiver_add);
 
 /**
  * Internal: receive raw data from mesh (not for app use)
