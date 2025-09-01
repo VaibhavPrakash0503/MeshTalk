@@ -36,8 +36,6 @@ extern uint8_t dev_uuid[16];
 extern esp_ble_mesh_model_t vendor_models[];
 
 /** Net/App indices & address */
-extern uint16_t net_idx;
-extern uint16_t app_idx;
 extern uint16_t unicast_addr;
 
 /**
