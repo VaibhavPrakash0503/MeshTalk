@@ -1,5 +1,4 @@
 #include "display.h"
-#include "driver/i2c.h"
 #include "ssd1306.h"
 #include <string.h>
 

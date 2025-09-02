@@ -1,4 +1,5 @@
 #include "app_state.h"
+#include <string.h>
 
 // Global state instance
 app_state_t g_app_state;
