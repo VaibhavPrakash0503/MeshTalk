@@ -31,8 +31,7 @@ const uint8_t app_key[16] = {0xAB, 0xCD, 0xEF, 0x01, 0x23, 0x45, 0x67, 0x89,
 static uint8_t static_oob_val[16] = {[0 ... 15] = 0xAA};
 
 /* Node unicast address (defined in node_config.h) */
-uint16_t unicast_addr =
-    UNICAST_ADDR; // replace UNICAST_ADDR with your node address
+uint16_t unicast_addr = UNICAST_ADDR;
 
 /* -------------------------------------------------------------------------- */
 /*                       Provisioning & Composition                           */

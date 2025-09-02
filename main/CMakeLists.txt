@@ -3,4 +3,4 @@ idf_component_register(
   core/display.c
 
   INCLUDE_DIRS "."
-  "headers")
+  "include")

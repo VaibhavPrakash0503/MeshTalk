@@ -20,8 +20,8 @@ extern "C" {
 /** Vendor Model ID */
 #define VENDOR_MODEL_ID 0x0000
 
-/** Unicast address for this node
- * defined in the node_config.h */
+/** Unicast address for this node */
+#define UNICAST_ADDR UNICAST_ADD
 
 /** Hardcoded NetKey (16 bytes) */
 extern const uint8_t net_key[16];
