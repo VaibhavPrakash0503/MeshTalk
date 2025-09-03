@@ -65,3 +65,15 @@ int user_table_find_index_by_addr(uint16_t addr) {
   }
   return -1; // not found
 }
+
+int user_table_find_index_by_name(const char *username) {
+  if (!username)
+    return -1;
+
+  for (int i = 0; i < MAX_USERS; i++) {
+    if (user_table[i].valid && strcmp(user_table[i].username, username) == 0) {
+      return i;
+    }
+  }
+  return -1; // not found
+}

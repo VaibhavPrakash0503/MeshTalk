@@ -37,3 +37,5 @@ const char *user_table_get_name(uint16_t unicast_addr);
 void user_table_print(void);
 
 int user_table_find_index_by_addr(uint16_t addr);
+
+int user_table_find_index_by_name(const char *username);

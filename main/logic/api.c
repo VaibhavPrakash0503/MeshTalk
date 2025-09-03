@@ -1,5 +1,6 @@
 #include "api.h"
 #include "app_state.h"
+#include "chat_log.h"
 #include "message_handler.h"
 #include "message_struct.h"
 #include "user_table.h"
@@ -55,14 +56,20 @@ void api_on_message_received(uint16_t sender_addr, const MeshMessage *m) {
     }
   }
 
+  // 1. Copy payload into buffer
+  static char buffer[MAX_MESSAGE_LEN + 1];
+  size_t copy_len =
+      (m->payload_len > MAX_MESSAGE_LEN) ? MAX_MESSAGE_LEN : m->payload_len;
+  memcpy(buffer, m->payload, copy_len);
+  buffer[copy_len] = '\0';
+
+  // <-- store in chat log -->
+  if (idx >= 0) {
+    chat_log_add(idx, buffer);
+  }
+
   // 2. Notify UI if registered
   if (ui_cb) {
-    static char buffer[MAX_MESSAGE_LEN + 1];
-    size_t copy_len =
-        (m->payload_len > MAX_MESSAGE_LEN) ? MAX_MESSAGE_LEN : m->payload_len;
-    memcpy(buffer, m->payload, copy_len);
-    buffer[copy_len] = '\0';
-
     ui_cb(sender_name, buffer);
   }
 }
