@@ -19,7 +19,8 @@ void message_handler_init(void) {
 /**
  * @brief Called by mesh.c whenever a raw buffer arrives
  */
-void message_handler_receive_raw(const uint8_t *data, size_t len) {
+void message_handler_receive_raw(uint16_t sender_addr, const uint8_t *data,
+                                 size_t len) {
   if (!data || len < 3) {
     return;
   }
@@ -29,7 +30,7 @@ void message_handler_receive_raw(const uint8_t *data, size_t len) {
   if (ret == 0) {
     // Pass processed message to application logic/UI
     if (app_receive_cb) {
-      app_receive_cb(&msg);
+      app_receive_cb(sender_addr, &msg);
     }
   }
 }
@@ -60,8 +61,7 @@ int message_handler_process_incoming(const uint8_t *data, size_t len,
     return -3;
   }
 
-  printf("Message received from %u -> %u, payload_len=%u\n", out_msg->sender_id,
-         out_msg->receiver_id, out_msg->payload_len);
+  printf("Message received");
   return 0;
 }
 
@@ -76,7 +76,7 @@ int message_handler_send(const MeshMessage *msg, uint16_t receiver_add) {
     return -1;
   }
 
-  uint8_t buffer[MAX_MESSAGE_LEN];
+  uint8_t buffer[sizeof(MeshMessage) + 4];
   size_t buffer_len = 0;
 
   // Serialize (without CRC)

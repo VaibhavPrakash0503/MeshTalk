@@ -2,8 +2,8 @@
 #include "app_state.h"
 #include "message_handler.h"
 #include "message_struct.h"
-#include "node_config.h"
 #include "user_table.h"
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -19,13 +19,11 @@ void api_init(ui_receive_cb_t cb) { ui_cb = cb; }
 /**
  * Convert plain text to MeshMessage and send via message_handler.
  */
-void api_send_text(uint16_t receiver_id, const char *msg) {
+void api_send_text(const char *receiver_name, const char *msg) {
   MeshMessage m;
   memset(&m, 0, sizeof(MeshMessage));
 
-  m.type = 1;                 // 1 = text message
-  m.sender_id = NODE_USER_ID; // Todo get from config/local table
-  m.receiver_id = receiver_id;
+  m.type = 1; // 1 = text message
   m.timestamp = (uint64_t)time(NULL);
 
   size_t msg_len = strlen(msg);
@@ -35,7 +33,7 @@ void api_send_text(uint16_t receiver_id, const char *msg) {
   m.payload_len = msg_len;
   memcpy(m.payload, msg, msg_len);
 
-  uint16_t receiver_add = get_unicast_addr(receiver_id);
+  uint16_t receiver_add = user_table_get_addr(receiver_name);
 
   message_handler_send(&m, receiver_add);
 }
@@ -44,13 +42,17 @@ void api_send_text(uint16_t receiver_id, const char *msg) {
  * Called by message_handler when a new message is received.
  * Converts MeshMessage → (sender_id, text) → UI callback.
  */
-void api_on_message_received(const MeshMessage *m) {
+void api_on_message_received(uint16_t sender_addr, const MeshMessage *m) {
 
-  int sender = m->sender_id;
+  const char *sender_name = user_table_get_name(sender_addr);
 
-  // Update new message flag if chat with this sender is not open
-  if (g_app_state.selected_user != sender) {
-    g_app_state.new_message_flags[sender] = true;
+  // --- If chat with this sender is not currently open, mark new message ---
+  int idx = user_table_find_index_by_addr(sender_addr);
+  if (idx >= 0) {
+    if (g_app_state.selected_user == 0x0000 ||
+        g_app_state.selected_user != sender_addr) {
+      g_app_state.new_message_flags[idx] = true; // mark flag for this user
+    }
   }
 
   // 2. Notify UI if registered
@@ -61,6 +63,6 @@ void api_on_message_received(const MeshMessage *m) {
     memcpy(buffer, m->payload, copy_len);
     buffer[copy_len] = '\0';
 
-    ui_cb(m->sender_id, buffer);
+    ui_cb(sender_name, buffer);
   }
 }

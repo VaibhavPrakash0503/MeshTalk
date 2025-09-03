@@ -13,12 +13,6 @@ int serialize_message(const MeshMessage *msg, uint8_t *out_buf,
 
   out_buf[idx++] = msg->type;
 
-  out_buf[idx++] = msg->sender_id & 0xFF;
-  out_buf[idx++] = (msg->sender_id >> 8) & 0xFF;
-
-  out_buf[idx++] = msg->receiver_id & 0xFF;
-  out_buf[idx++] = (msg->receiver_id >> 8) & 0xFF;
-
   for (int i = 0; i < 8; ++i) {
     out_buf[idx++] = (msg->timestamp >> (i * 8)) & 0xFF;
   }
@@ -34,18 +28,12 @@ int serialize_message(const MeshMessage *msg, uint8_t *out_buf,
 
 int deserialize_message(const uint8_t *in_buf, size_t in_len,
                         MeshMessage *msg) {
-  if (!in_buf || !msg || in_len < 14 + 2)
+  if (!in_buf || !msg || in_len < 12)
     return -1;
 
   size_t idx = 0;
 
   msg->type = in_buf[idx++];
-
-  msg->sender_id = in_buf[idx++];
-  msg->sender_id |= ((uint16_t)in_buf[idx++]) << 8;
-
-  msg->receiver_id = in_buf[idx++];
-  msg->receiver_id |= ((uint16_t)in_buf[idx++]) << 8;
 
   msg->timestamp = 0;
   for (int i = 0; i < 8; ++i) {

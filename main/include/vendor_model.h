@@ -25,12 +25,6 @@ extern esp_ble_mesh_model_op_t op_vendor[];
 void vendor_model_cb(esp_ble_mesh_model_cb_event_t event,
                      esp_ble_mesh_model_cb_param_t *param);
 
-/**
- * @brief Provisioning callback (registered in mesh_init.c)
- */
-void provisioning_cb(esp_ble_mesh_prov_cb_event_t event,
-                     esp_ble_mesh_prov_cb_param_t *param);
-
 #ifdef __cplusplus
 }
 #endif

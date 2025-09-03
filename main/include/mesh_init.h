@@ -1,7 +1,6 @@
 #pragma once
 
 #include "esp_ble_mesh_defs.h"
-#include "node_config.h"
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -20,9 +19,6 @@ extern "C" {
 /** Vendor Model ID */
 #define VENDOR_MODEL_ID 0x0000
 
-/** Unicast address for this node */
-#define UNICAST_ADDR UNICAST_ADD
-
 /** Hardcoded NetKey (16 bytes) */
 extern const uint8_t net_key[16];
 
@@ -35,13 +31,16 @@ extern uint8_t dev_uuid[16];
 /** Vendor model array (exported for mesh.c or model_vendor.c use) */
 extern esp_ble_mesh_model_t vendor_models[];
 
-/** Net/App indices & address */
-extern uint16_t unicast_addr;
-
 /**
  * @brief Initialize BLE Mesh stack with static provisioning.
  */
 void mesh_init(void);
+
+/**
+ * @brief Provisioning callback (implemented in mesh_init.c).
+ */
+void provisioning_cb(esp_ble_mesh_prov_cb_event_t event,
+                     esp_ble_mesh_prov_cb_param_t *param);
 
 #ifdef __cplusplus
 }

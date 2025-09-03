@@ -7,6 +7,6 @@
 #define SYMBOL_NEW_MESSAGE "*"
 
 // Misc
-#define MAX_USERS 5 // Max number of known users in the chat
+#define MAX_USERS 3 // Max number of known users in the chat
 #define USERNAME_MAX_LEN 5
 #define CHAT_LOG_SIZE 15 // Limit for display names

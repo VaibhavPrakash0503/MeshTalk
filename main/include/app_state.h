@@ -3,13 +3,14 @@
 #include "types_common.h"
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 /**
  * @brief Global application state
  */
 typedef struct {
   screen_t current_screen;
-  int selected_user;
+  uint16_t selected_user;
   bool new_message_flags[MAX_USERS];
 } app_state_t;
 
