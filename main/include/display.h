@@ -1,5 +1,4 @@
 #pragma once
-#include "types_common.h"
 
 // Initialize the display hardware
 void display_init(void);
