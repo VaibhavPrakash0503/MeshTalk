@@ -8,5 +8,5 @@
 
 // Misc
 #define MAX_USERS 3 // Max number of known users in the chat
-#define USERNAME_MAX_LEN 5
-#define CHAT_LOG_SIZE 15 // Limit for display names
+#define USERNAME_MAX_LEN 10
+#define CHAT_LOG_SIZE 10 // Limit for display names

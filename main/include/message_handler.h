@@ -7,7 +7,7 @@
 /**
  * Application-level callback (receives fully processed MeshMessage)
  */
-typedef void (*app_receive_cb_t)(uint16_t sender_addr, const MeshMessage *msg);
+typedef void (*app_receive_cb_t)(const MeshMessage *msg);
 
 /**
  * Initialize the message handler and hook into mesh
@@ -22,8 +22,7 @@ int message_handler_send(const MeshMessage *msg, uint16_t receiver_add);
 /**
  * Internal: receive raw data from mesh (not for app use)
  */
-void message_handler_receive_raw(uint16_t sender_addr, const uint8_t *data,
-                                 size_t len);
+void message_handler_receive_raw(const uint8_t *data, size_t len);
 
 /**
  * Process an incoming raw buffer (verify CRC, deserialize)
@@ -35,3 +34,5 @@ int message_handler_process_incoming(const uint8_t *data, size_t len,
  * Register app callback for processed messages
  */
 void message_handler_register_app_cb(app_receive_cb_t cb);
+
+void message_handler_broadcast(MeshMessage *msg);

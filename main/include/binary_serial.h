@@ -4,7 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define MAX_SERIALIZED_SIZE (1 + 8 + 1 + MAX_PAYLOAD_SIZE)
+#define MAX_SERIALIZED_SIZE                                                    \
+  (1 + 8 + USERNAME_MAX_LEN + 2 + 1 + MAX_PAYLOAD_SIZE)
 
 int serialize_message(const MeshMessage *msg, uint8_t *out_buf,
                       size_t *out_len);

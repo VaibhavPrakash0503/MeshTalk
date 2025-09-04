@@ -1,9 +1,10 @@
 #pragma once
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
-#define MAX_CHAT_PER_USER 5
+#define MAX_CHAT_PER_USER 10
 #define MAX_MESSAGE_LEN 100
 
 typedef struct {
@@ -22,7 +23,7 @@ void chat_log_init(void);
  * @param user_idx Index in user_table
  * @param msg      Message string (null-terminated)
  */
-void chat_log_add(int user_idx, const char *msg);
+void chat_log_add(int user_idx, const char *msg, bool outgoing);
 
 /**
  * Retrieve all stored chat messages for a user index
