@@ -1,0 +1,26 @@
+CompileFlags:
+  Remove: 
+    - "-fno-tree-switch-conversion"
+    - "-mtext-section-literals"
+    - "-mlongcalls" 
+    - "-fstrict-volatile-bitfields"
+    - "-fno-jump-tables"
+    - "-fno-tree-loop-distribute-patterns"
+    - "-mlongcalls"
+    - "-mfix-esp32-psram-cache-issue"
+    - "-mfix-esp32-psram-cache-strategy=*"
+    - "-fno-rtti"
+    - "-fno-shrink-wrap"
+  Add:
+    - "-Wno-unknown-pragmas" 
+    - "-I~/.espressif/tools/xtensa-esp32-elf/esp-12.2.0_20230208/xtensa-esp32-elf/xtensa-esp32-elf/include"
+    - "-I~/.espressif/tools/xtensa-esp32-elf/esp-12.2.0_20230208/xtensa-esp32-elf/lib/gcc/xtensa-esp32-elf/12.2.0/include"
+    - "-I~/.espressif/tools/xtensa-esp32-elf/esp-12.2.0_20230208/xtensa-esp32-elf/xtensa-esp32-elf/include/c++/12.2.0"
+
+Diagnostics:
+  Suppress:
+    - "drv_unknown_argument"
+    - "unused-command-line-argument-hard-error-in-future"
+
+Index:
+  Background: Build

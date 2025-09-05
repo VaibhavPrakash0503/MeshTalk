@@ -4,8 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define MAX_CHAT_PER_USER 10
-#define MAX_MESSAGE_LEN 100
+#define MAX_CHAT_PER_USER 6
+#define MAX_MESSAGE_LEN 64
 
 typedef struct {
   char messages[MAX_CHAT_PER_USER][MAX_MESSAGE_LEN + 1]; // Last 5 messages

@@ -1,333 +1,421 @@
 #include "ui_screens.h"
-#include "display.h"
+#include "api.h"
 #include "app_state.h"
 #include "constants.h"
-#include "api.h"
-#include "joystick.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include <stdio.h>
+#include "display.h"
+#include "esp_log.h"
+#include "esp_timer.h"
+#include "types_common.h"
+#include "user_table.h"
 #include <string.h>
 
-// UI state for cursor management (using static variables since they're not in app_state)
-static int home_cursor = 0;
-static int chat_cursor = 0;
-static int chat_scroll_offset = 0;
-static bool screen_needs_full_refresh = true;
-static bool cursor_needs_refresh = true;
-static int last_cursor_pos = -1;
-static screen_t current_ui_screen = SCREEN_HOME;
+static const char *TAG = "UI_SCREENS";
 
-// Contact data from API
-static char contact_names[MAX_USERS][USERNAME_MAX_LEN];
+// Pre-defined message options
+static const char *predefined_messages[UI_PREDEFINED_MSG_COUNT] = {
+    "Hello", "How are you?", "Thanks", "Yes", "No", "OK", "Goodbye"};
+
+// Internal UI state (separate from app_state)
+static ui_internal_state_t ui_internal = {.cursor_pos = 0,
+                                          .scroll_offset = 0,
+                                          .screen_needs_update = true,
+                                          .broadcast_active = false,
+                                          .broadcast_start_time = 0};
+
+// Screen data using constants
+static char contact_list[MAX_USERS][USERNAME_MAX_LEN];
 static int contact_count = 0;
-
-// Predefined messages
-const char *predefined_msgs[] = {
-    "Hello", "How are you?", "On my way", "Bye!"
-};
-const int num_predefined_msgs = sizeof(predefined_msgs)/sizeof(predefined_msgs[0]);
-
-// Forward declarations
-static void ui_handle_joystick_input(void);
-static void ui_update_cursor_only(void);
-static void ui_message_received_callback(const char *sender_name, const char *msg);
-static void ui_update_contact_list(void);
-static void ui_show_broadcasting(void);
+static char chat_messages[50][MAX_MESSAGE_LEN + USERNAME_MAX_LEN + 10];
+static int message_count = 0;
 
 void ui_init(void) {
-    display_init();
-    joystick_init();
-    app_state_init();
-    
-    // Initialize API with message callback
-    api_init(ui_message_received_callback);
-    
-    // Initialize UI state
-    home_cursor = 0;
-    chat_cursor = 0;
-    chat_scroll_offset = 0;
-    screen_needs_full_refresh = true;
-    cursor_needs_refresh = true;
-    current_ui_screen = SCREEN_HOME;
-    last_cursor_pos = -1;
-    
-    // Load contacts from API
-    ui_update_contact_list();
-    
-    ui_render_screen(SCREEN_HOME);
+  ESP_LOGI(TAG, "Initializing MeshTalk UI...");
+
+  display_init();
+  api_init(ui_on_message_received);
+
+  // Use app_state for initial screen
+  app_state_set_screen(SCREEN_HOME);
+  ui_internal.screen_needs_update = true;
+
+  ESP_LOGI(TAG, "✅ MeshTalk UI initialized");
 }
 
-void ui_render_screen(screen_t screen) {
-    current_ui_screen = screen;
-    app_state_set_screen(screen);
-    screen_needs_full_refresh = true;
-    cursor_needs_refresh = true;
-    last_cursor_pos = -1;
-    
-    // Full screen refresh
+void ui_set_screen(screen_t screen) {
+  // Use app_state for screen management
+  app_state_set_screen(screen);
+  ui_internal.cursor_pos = 0;
+  ui_internal.scroll_offset = 0;
+  ui_internal.screen_needs_update = true;
+
+  // Clear new message flag when opening individual chat
+  if (screen == SCREEN_INDIVIDUAL_CHAT) {
+    const char *selected_user = app_state_get_selected_user();
+    if (selected_user[0] != '\0') {
+      int user_idx = user_table_find_index_by_name(selected_user);
+      if (user_idx >= 0) {
+        app_state_clear_new_message(user_idx);
+        ESP_LOGI(TAG, "Cleared new message flag for %s", selected_user);
+      }
+    }
+  }
+
+  ESP_LOGI(TAG, "Screen changed to: %d", screen);
+}
+
+void ui_go_back(void) {
+  screen_t current = app_state_get_screen();
+
+  switch (current) {
+  case SCREEN_CHAT:
+    ui_set_screen(SCREEN_HOME);
+    break;
+  case SCREEN_INDIVIDUAL_CHAT:
+    ui_set_screen(SCREEN_CHAT);
+    break;
+  case SCREEN_SEND_MESSAGE:
+    ui_set_screen(SCREEN_INDIVIDUAL_CHAT);
+    break;
+  case SCREEN_BROADCAST:
+    ui_set_screen(SCREEN_HOME);
+    break;
+  default:
+    break;
+  }
+}
+
+screen_t ui_get_current_screen(void) { return app_state_get_screen(); }
+
+// HOME SCREEN (Menu mode)
+void ui_show_home_screen(void) {
+  const char *menu_items[] = {"Chat", "Broadcast"};
+
+  display_set_mode(DISPLAY_MODE_MENU);
+  display_show_menu_screen("MeshTalk", menu_items, 2, ui_internal.cursor_pos);
+
+  ESP_LOGD(TAG, "Home screen displayed, cursor at %d", ui_internal.cursor_pos);
+}
+
+// CHAT LIST SCREEN with new message indicators
+void ui_show_chat_screen(void) {
+  contact_count = api_get_contact_names(contact_list, MAX_USERS);
+
+  if (contact_count == 0) {
+    const char *empty_list[] = {"No contacts found"};
+    display_set_mode(DISPLAY_MODE_LIST);
+    display_show_list_screen("Chat", empty_list, 1, 0, 0);
+    return;
+  }
+
+  // Create contact display names with new message indicators using
+  // SYMBOL_NEW_MESSAGE
+  static char display_names[MAX_USERS][USERNAME_MAX_LEN + 5];
+  for (int i = 0; i < contact_count; i++) {
+    int user_idx = user_table_find_index_by_name(contact_list[i]);
+    if (user_idx >= 0 && app_state_has_new_message(user_idx)) {
+      snprintf(display_names[i], sizeof(display_names[i]), "%s %s",
+               contact_list[i], SYMBOL_NEW_MESSAGE);
+    } else {
+      strncpy(display_names[i], contact_list[i], sizeof(display_names[i]) - 1);
+      display_names[i][sizeof(display_names[i]) - 1] = '\0';
+    }
+  }
+
+  // Calculate scroll offset for smooth scrolling
+  int visible_items = 7;
+  if (ui_internal.cursor_pos >= ui_internal.scroll_offset + visible_items) {
+    ui_internal.scroll_offset = ui_internal.cursor_pos - visible_items + 1;
+  } else if (ui_internal.cursor_pos < ui_internal.scroll_offset) {
+    ui_internal.scroll_offset = ui_internal.cursor_pos;
+  }
+
+  const char *contact_names[MAX_USERS];
+  for (int i = 0; i < contact_count; i++) {
+    contact_names[i] = display_names[i];
+  }
+
+  display_set_mode(DISPLAY_MODE_LIST);
+  display_show_list_screen("Chat", contact_names, contact_count,
+                           ui_internal.cursor_pos, ui_internal.scroll_offset);
+
+  ESP_LOGD(TAG, "Chat screen displayed: %d contacts", contact_count);
+}
+
+// INDIVIDUAL CHAT SCREEN
+void ui_show_individual_chat_screen(const char *contact_name) {
+  static char raw_messages[50][MAX_MESSAGE_LEN + 1];
+  message_count = api_get_chat_log(contact_name, raw_messages, 50);
+
+  // Safe message formatting with null termination
+  for (int i = 0; i < message_count; i++) {
+    strncpy(chat_messages[i], raw_messages[i], sizeof(chat_messages[i]) - 1);
+    chat_messages[i][sizeof(chat_messages[i]) - 1] = '\0';
+  }
+
+  display_set_mode(DISPLAY_MODE_CHAT);
+  display_clear();
+
+  // Header with contact name
+  display_center_text(0, contact_name, false);
+
+  // Show recent messages (lines 1-6)
+  int start_msg = (message_count > UI_CHAT_HISTORY_LINES)
+                      ? message_count - UI_CHAT_HISTORY_LINES
+                      : 0;
+
+  for (int i = 0; i < UI_CHAT_HISTORY_LINES; i++) {
+    int msg_index = start_msg + i;
+    if (msg_index < message_count) {
+      display_list_line(i + 1, chat_messages[msg_index], false);
+    } else {
+      display_list_line(i + 1, "", false);
+    }
+  }
+
+  // Show "Send Message" option on line 7
+  bool send_selected = (ui_internal.cursor_pos == 0);
+  display_list_line(7, "Send Message", send_selected);
+
+  ESP_LOGD(TAG, "Individual chat displayed: %s, %d messages", contact_name,
+           message_count);
+}
+
+// SEND MESSAGE SCREEN
+void ui_show_send_message_screen(void) {
+  display_set_mode(DISPLAY_MODE_LIST);
+  display_clear();
+
+  // Header
+  char header[32];
+  const char *selected_user = app_state_get_selected_user();
+  snprintf(header, sizeof(header), "Send to %s", selected_user);
+  display_center_text(0, header, false);
+
+  // Show message options (lines 1-7)
+  int visible_options = 7;
+  for (int i = 0; i < visible_options && i < UI_PREDEFINED_MSG_COUNT; i++) {
+    int option_index = ui_internal.scroll_offset + i;
+    if (option_index < UI_PREDEFINED_MSG_COUNT) {
+      bool is_selected = (option_index == ui_internal.cursor_pos);
+      display_list_line(i + 1, predefined_messages[option_index], is_selected);
+    } else {
+      display_list_line(i + 1, "", false);
+    }
+  }
+
+  ESP_LOGD(TAG, "Send message screen displayed, cursor at %d",
+           ui_internal.cursor_pos);
+}
+
+// BROADCAST SCREEN
+void ui_show_broadcast_screen(void) {
+  display_set_mode(DISPLAY_MODE_MENU);
+  display_clear();
+
+  display_center_text(1, "Broadcasting...", true);
+  display_center_text(2, "Please wait", false);
+
+  ESP_LOGD(TAG, "Broadcast screen displayed");
+}
+
+void ui_update(void) {
+  // Check broadcast timeout
+  if (app_state_get_screen() == SCREEN_BROADCAST &&
+      ui_internal.broadcast_active) {
+    int64_t elapsed_ms =
+        (esp_timer_get_time() - ui_internal.broadcast_start_time) / 1000;
+    if (elapsed_ms > UI_BROADCAST_TIMEOUT_MS) {
+      ui_internal.broadcast_active = false;
+      ui_set_screen(SCREEN_HOME);
+      ESP_LOGI(TAG, "Broadcast timeout - returning to home");
+      return;
+    }
+  }
+
+  if (!ui_internal.screen_needs_update)
+    return;
+
+  screen_t current = app_state_get_screen();
+  switch (current) {
+  case SCREEN_HOME:
+    ui_show_home_screen();
+    break;
+  case SCREEN_CHAT:
+    ui_show_chat_screen();
+    break;
+  case SCREEN_INDIVIDUAL_CHAT:
+    ui_show_individual_chat_screen(app_state_get_selected_user());
+    break;
+  case SCREEN_SEND_MESSAGE:
+    ui_show_send_message_screen();
+    break;
+  case SCREEN_BROADCAST:
+    ui_show_broadcast_screen();
+    break;
+  }
+
+  ui_internal.screen_needs_update = false;
+}
+
+void ui_navigate_up(void) {
+  if (ui_internal.cursor_pos > 0) {
+    ui_internal.cursor_pos--;
+    ui_internal.screen_needs_update = true;
+  }
+}
+
+void ui_navigate_down(void) {
+  int max_pos = 0;
+  screen_t current = app_state_get_screen();
+
+  switch (current) {
+  case SCREEN_HOME:
+    max_pos = 1; // Chat, Broadcast
+    break;
+  case SCREEN_CHAT:
+    max_pos = contact_count - 1;
+    break;
+  case SCREEN_INDIVIDUAL_CHAT:
+    max_pos = 0; // Only Send Message option
+    break;
+  case SCREEN_SEND_MESSAGE:
+    max_pos = UI_PREDEFINED_MSG_COUNT - 1;
+    break;
+  case SCREEN_BROADCAST: // Handle broadcast case
+    max_pos = 0;         // No navigation during broadcast
+    break;
+  default: // Add default case to fix clangd error
+    ESP_LOGW(TAG, "Unknown screen in navigate_down: %d", current);
+    max_pos = 0;
+    break;
+  }
+
+  if (ui_internal.cursor_pos < max_pos) {
+    ui_internal.cursor_pos++;
+    ui_internal.screen_needs_update = true;
+  }
+}
+
+void ui_select_current_item(void) {
+  screen_t current = app_state_get_screen();
+
+  switch (current) {
+  case SCREEN_HOME:
+    if (ui_internal.cursor_pos == 0) { // Chat
+      ui_set_screen(SCREEN_CHAT);
+    } else if (ui_internal.cursor_pos == 1) { // Broadcast
+      api_broadcast_addr();
+      ui_internal.broadcast_active = true;
+      ui_internal.broadcast_start_time = esp_timer_get_time();
+      ui_set_screen(SCREEN_BROADCAST);
+    }
+    break;
+
+  case SCREEN_CHAT:
+    if (contact_count > 0 && ui_internal.cursor_pos < contact_count) {
+      // Use app_state to set selected user
+      app_state_set_selected_user(contact_list[ui_internal.cursor_pos]);
+      ui_set_screen(SCREEN_INDIVIDUAL_CHAT);
+    }
+    break;
+
+  case SCREEN_INDIVIDUAL_CHAT:
+    if (ui_internal.cursor_pos == 0) { // Send Message option
+      ui_set_screen(SCREEN_SEND_MESSAGE);
+    }
+    break;
+
+  case SCREEN_SEND_MESSAGE:
+    ui_send_selected_message();
+    break;
+  case SCREEN_BROADCAST: // No user interaction during broadcast - just showing
+                         // status
+    break;
+  default:
+    ESP_LOGW(TAG, "Unknown screen in select_current_item: %d", current);
+    break;
+  }
+}
+
+void ui_send_selected_message(void) {
+  if (ui_internal.cursor_pos < UI_PREDEFINED_MSG_COUNT) {
+    const char *message = predefined_messages[ui_internal.cursor_pos];
+    const char *selected_user = app_state_get_selected_user();
+
+    ESP_LOGI(TAG, "Sending message '%s' to %s", message, selected_user);
+
+    // Call API to send message
+    api_send_text(selected_user, message);
+
+    // Show confirmation
     display_clear();
-    switch (screen) {
-        case SCREEN_HOME: 
-            ui_show_home(); 
-            break;
-        case SCREEN_CHAT: 
-            ui_show_chat(); 
-            break;
-        case SCREEN_ABOUT: 
-            ui_show_about(); 
-            break;
-        default: 
-            display_draw_text(0, "Unknown screen"); 
-            break;
-    }
-    display_update();
-    screen_needs_full_refresh = false;
-    
-    // Start input handling loop
-    ui_handle_joystick_input();
+    display_center_text(2, "Message Sent!", true);
+    vTaskDelay(pdMS_TO_TICKS(UI_MESSAGE_SENT_DISPLAY_MS));
+
+    ui_set_screen(SCREEN_INDIVIDUAL_CHAT);
+  }
 }
 
-void ui_show_home(void) {
-    if (screen_needs_full_refresh) {
-        display_draw_text(0, "Home");
-        const char *options[] = { "Chat", "Broadcasting", "About" };
-        
-        for (int i = 0; i < 3; i++) {
-            char line[32];
-            snprintf(line, sizeof(line), "  %s", options[i]);
-            display_draw_text(2 + i, line);
-        }
-    }
-    
-    // Update cursor
-    if (cursor_needs_refresh) {
-        ui_update_cursor_only();
-    }
+void ui_handle_joystick(joystick_action_t action) {
+  switch (action) {
+  case JOY_UP:
+    ui_navigate_up();
+    break;
+  case JOY_DOWN:
+    ui_navigate_down();
+    break;
+  case JOY_LEFT: // Go back
+    ui_go_back();
+    break;
+  case JOY_RIGHT:
+  case JOY_BTN: // Select option
+    ui_select_current_item();
+    break;
+  case JOY_NONE:
+    break;
+  }
 }
 
-void ui_show_chat(void) {
-    if (screen_needs_full_refresh) {
-        // Update contact list from API
-        ui_update_contact_list();
-        
-        display_draw_text(0, "Contacts");
-        
-        // Display contacts (3 rows max)
-        int display_count = (contact_count > 3) ? 3 : contact_count;
-        for (int i = 0; i < display_count; i++) {
-            int contact_idx = i + chat_scroll_offset;
-            if (contact_idx >= contact_count) break;
-            
-            char line[32];
-            const char *status_symbol = (contact_idx % 2 == 0) ? SYMBOL_ONLINE : SYMBOL_OFFLINE;
-            const char *new_msg_symbol = app_state_has_new_message(contact_idx) ? SYMBOL_NEW_MESSAGE : "";
-            
-            snprintf(line, sizeof(line), "  %s %s %s",
-                     status_symbol, 
-                     (contact_idx < contact_count) ? contact_names[contact_idx] : "Unknown", 
-                     new_msg_symbol);
-            display_draw_text(2 + i, line);
-        }
+// MESSAGE CALLBACK with app_state integration
+void ui_on_message_received(const char *sender, const char *message) {
+  ESP_LOGI(TAG, "New message from %s: %s", sender, message);
+
+  const char *current_user = app_state_get_selected_user();
+
+  // If viewing this contact's chat, refresh and clear flag
+  if (app_state_get_screen() == SCREEN_INDIVIDUAL_CHAT &&
+      strcmp(current_user, sender) == 0) {
+    ui_internal.screen_needs_update = true;
+    int user_idx = user_table_find_index_by_name(sender);
+    if (user_idx >= 0) {
+      app_state_clear_new_message(user_idx);
     }
-    
-    // Update cursor
-    if (cursor_needs_refresh) {
-        ui_update_cursor_only();
+  } else {
+    // Set new message flag
+    int user_idx = user_table_find_index_by_name(sender);
+    if (user_idx >= 0) {
+      g_app_state.new_message_flags[user_idx] = true;
     }
+  }
+
+  // Refresh chat list if viewing it
+  if (app_state_get_screen() == SCREEN_CHAT) {
+    ui_internal.screen_needs_update = true;
+  }
 }
 
-static void ui_show_broadcasting(void) {
-    display_clear();
-    display_draw_text(0, "Broadcasting");
-    display_draw_text(2, "Broadcasting...");
-    display_update();
-    
-    // Trigger API broadcast
-    api_broadcast_addr();
-    
-    // Show broadcasting message for 2 seconds then go back to home
-    vTaskDelay(pdMS_TO_TICKS(2000));
-    
-    ui_render_screen(SCREEN_HOME);
+// Utility functions
+bool ui_needs_update(void) { return ui_internal.screen_needs_update; }
+
+void ui_mark_dirty(void) { ui_internal.screen_needs_update = true; }
+
+void ui_clear_dirty(void) { ui_internal.screen_needs_update = false; }
+
+const char *ui_get_predefined_message(int index) {
+  if (index >= 0 && index < UI_PREDEFINED_MSG_COUNT) {
+    return predefined_messages[index];
+  }
+  return NULL;
 }
 
-void ui_show_about(void) {
-    if (screen_needs_full_refresh) {
-        display_draw_text(0, "About");
-        display_draw_text(2, "  MeshTalk v1.0");
-        display_draw_text(3, "  ESP32 BLE Mesh");
-    }
-    
-    // No cursor for about page - it's static
-}
-
-// Handle joystick input without full screen refresh
-static void ui_handle_joystick_input(void) {
-    while (1) {
-        joystick_action_t action = joystick_get_action();
-        
-        if (action == JOY_NONE) {
-            vTaskDelay(pdMS_TO_TICKS(50)); // Small delay to prevent overwhelming
-            continue;
-        }
-        
-        switch (current_ui_screen) {
-            case SCREEN_HOME:
-                if (action == JOY_UP && home_cursor > 0) {
-                    home_cursor--;
-                    cursor_needs_refresh = true;
-                } else if (action == JOY_DOWN && home_cursor < 2) {
-                    home_cursor++;
-                    cursor_needs_refresh = true;
-                } else if (action == JOY_BTN) {
-                    if (home_cursor == 0) {
-                        ui_render_screen(SCREEN_CHAT);
-                        return;
-                    } else if (home_cursor == 1) {
-                        ui_show_broadcasting();
-                        return;
-                    } else if (home_cursor == 2) {
-                        ui_render_screen(SCREEN_ABOUT);
-                        return;
-                    }
-                }
-                break;
-                
-            case SCREEN_CHAT:
-                {
-                    int max_visible = (contact_count > 3) ? 3 : contact_count;
-                    if (action == JOY_UP && chat_cursor > 0) {
-                        chat_cursor--;
-                        cursor_needs_refresh = true;
-                    } else if (action == JOY_DOWN && chat_cursor < max_visible - 1) {
-                        chat_cursor++;
-                        cursor_needs_refresh = true;
-                    } else if (action == JOY_BTN) {
-                        int selected_user = chat_cursor + chat_scroll_offset;
-                        if (selected_user < contact_count) {
-                            app_state_set_selected_user(contact_names[selected_user]);
-                            app_state_clear_new_message(selected_user);
-                            
-                            // Show individual chat (simplified for now)
-                            display_clear();
-                            display_draw_text(0, contact_names[selected_user]);
-                            display_draw_text(2, "  Open Messages");
-                            display_draw_text(3, "  Send Message");
-                            display_update();
-                            
-                            // Wait for input and return to contacts
-                            while (joystick_get_action() != JOY_LEFT) {
-                                vTaskDelay(pdMS_TO_TICKS(100));
-                            }
-                            
-                            ui_render_screen(SCREEN_CHAT);
-                            return;
-                        }
-                    } else if (action == JOY_LEFT) {
-                        ui_render_screen(SCREEN_HOME);
-                        return;
-                    }
-                }
-                break;
-                
-            case SCREEN_ABOUT:
-                if (action == JOY_LEFT || action == JOY_BTN) {
-                    ui_render_screen(SCREEN_HOME);
-                    return;
-                }
-                break;
-        }
-        
-        // Update cursor if needed
-        if (cursor_needs_refresh) {
-            ui_update_cursor_only();
-        }
-    }
-}
-
-// Update only cursor position without full screen refresh
-static void ui_update_cursor_only(void) {
-    int current_cursor = 0;
-    int line_offset = 2; // Most screens start content at line 2
-    
-    switch (current_ui_screen) {
-        case SCREEN_HOME:
-            current_cursor = home_cursor;
-            break;
-        case SCREEN_CHAT:
-            current_cursor = chat_cursor;
-            break;
-        default:
-            return; // No cursor updates needed
-    }
-    
-    // CRITICAL: Only update the specific lines that changed - NO FULL SCREEN REFRESH
-    
-    if (last_cursor_pos != -1 && last_cursor_pos != current_cursor) {
-        // Clear old cursor position by redrawing the line without ">"
-        char blank_line[32];
-
-        switch (current_ui_screen) {
-            case SCREEN_HOME: {
-                const char *options[] = { "Chat", "Broadcasting", "About" };
-                snprintf(blank_line, sizeof(blank_line), "  %s", options[last_cursor_pos]);
-                display_draw_text(line_offset + last_cursor_pos, blank_line);
-                break;
-            }
-            case SCREEN_CHAT: {
-                int idx = last_cursor_pos + chat_scroll_offset;
-                if (idx < contact_count) {
-                    const char *status_symbol = (idx % 2 == 0) ? SYMBOL_ONLINE : SYMBOL_OFFLINE;
-                    const char *new_msg_symbol = app_state_has_new_message(idx) ? SYMBOL_NEW_MESSAGE : "";
-                    snprintf(blank_line, sizeof(blank_line), "  %s %s %s", status_symbol, contact_names[idx], new_msg_symbol);
-                    display_draw_text(line_offset + last_cursor_pos, blank_line);
-                }
-                break;
-            }
-        }
-    }
-    
-    // Draw new cursor position with ">"
-    char cursor_line[32];
-    
-    switch (current_ui_screen) {
-        case SCREEN_HOME: {
-            const char *options[] = { "Chat", "Broadcasting", "About" };
-            snprintf(cursor_line, sizeof(cursor_line), "> %s", options[current_cursor]);
-            display_draw_text(line_offset + current_cursor, cursor_line);
-            break;
-        }
-        case SCREEN_CHAT: {
-            int idx = current_cursor + chat_scroll_offset;
-            if (idx < contact_count) {
-                const char *status_symbol = (idx % 2 == 0) ? SYMBOL_ONLINE : SYMBOL_OFFLINE;
-                const char *new_msg_symbol = app_state_has_new_message(idx) ? SYMBOL_NEW_MESSAGE : "";
-                snprintf(cursor_line, sizeof(cursor_line), "> %s %s %s", status_symbol, contact_names[idx], new_msg_symbol);
-                display_draw_text(line_offset + current_cursor, cursor_line);
-            }
-            break;
-        }
-    }
-
-    display_update();
-
-    last_cursor_pos = current_cursor;
-    cursor_needs_refresh = false;
-}
-
-static void ui_update_contact_list(void) {
-    contact_count = api_get_contact_names(contact_names, MAX_USERS);
-}
-
-static void ui_message_received_callback(const char *sender_name, const char *msg) {
-    // Update contact list and refresh if on chat screen
-    ui_update_contact_list();
-    
-    if (current_ui_screen == SCREEN_CHAT) {
-        screen_needs_full_refresh = true;
-        ui_show_chat();
-        display_update();
-        screen_needs_full_refresh = false;
-    }
-}
+int ui_get_predefined_message_count(void) { return UI_PREDEFINED_MSG_COUNT; }

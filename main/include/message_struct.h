@@ -3,7 +3,6 @@
 #include <stdint.h>
 
 #define MAX_PAYLOAD_SIZE 255
-#define MAX_MESSAGE_LEN 100
 
 typedef struct {
   uint8_t type;                       // 1 = text 2 = broadcast

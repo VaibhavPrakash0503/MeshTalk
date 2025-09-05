@@ -36,3 +36,6 @@ void app_state_set_selected_user(const char *username);
 
 // Get unread message flag
 bool app_state_has_new_message(int user_idx);
+
+// Clear unread flag
+void app_state_clear_new_message(int user_idx);
