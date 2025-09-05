@@ -1,6 +1,19 @@
 idf_component_register(
-  SRCS "MeshTalk.c"
-  core/display.c
-
-  INCLUDE_DIRS "."
-  "include")
+  SRCS 
+    "MeshTalk.c"
+    "core/display.c"
+    "core/crc16.c"
+    "core/binary_serial.c"
+    "core/node_config.c"
+    "core/user_table.c"
+    "logic/api.c"
+    "logic/app_state.c"
+    "logic/message_handler.c"
+    "mesh/mesh.c"
+    "mesh/mesh_init.c"
+    "mesh/vendor_model.c"
+    "ui/chat_log.c"
+  INCLUDE_DIRS
+    "."
+    "include"
+)

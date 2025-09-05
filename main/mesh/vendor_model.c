@@ -1,14 +1,14 @@
+#include "vendor_model.h"
 #include "esp_ble_mesh_networking_api.h"
 #include "esp_log.h"
-#include "mesh.h" // forward to mesh.c
-#include "model_vendor.h"
+#include "mesh.h"
 
 static const char *TAG = "VENDOR_MODEL";
 
 /** Vendor model opcode table */
 esp_ble_mesh_model_op_t op_vendor[] = {
-    {VENDOR_OPCODE_MESSAGE, 0, NULL},
-    {VENDOR_OPCODE_ACK, 0, NULL},
+    {VENDOR_OPCODE_MESSAGE, 0, 0},
+    {VENDOR_OPCODE_ACK, 0, 0},
     ESP_BLE_MESH_MODEL_OP_END,
 };
 

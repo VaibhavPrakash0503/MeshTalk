@@ -2,7 +2,7 @@
 #include "esp_ble_mesh_networking_api.h"
 #include "esp_log.h"
 #include "mesh_init.h"
-#include "model_vendor.h"
+#include "vendor_model.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -46,7 +46,7 @@ void mesh_vendor_model_cb(esp_ble_mesh_model_cb_event_t event,
 /*                            Message sending                                 */
 /* -------------------------------------------------------------------------- */
 int mesh_send_raw(const uint8_t *data, size_t data_len, uint16_t receiver_add) {
-  if (!vendor_models[0].model || !data || data_len == 0) {
+  if (data_len == 0) {
     ESP_LOGE(TAG, "Invalid arguments to mesh_send_raw");
     return -1;
   }
@@ -55,7 +55,6 @@ int mesh_send_raw(const uint8_t *data, size_t data_len, uint16_t receiver_add) {
   ctx.net_idx = NET_IDX;
   ctx.app_idx = APP_IDX;
   ctx.addr = receiver_add;
-  ctx.send_rel = true;
   ctx.send_ttl = 5;
 
   esp_err_t err = esp_ble_mesh_client_model_send_msg(

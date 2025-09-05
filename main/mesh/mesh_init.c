@@ -4,6 +4,7 @@
 #include "esp_ble_mesh_networking_api.h"
 #include "esp_ble_mesh_provisioning_api.h"
 #include "esp_log.h"
+#include "esp_mac.h"
 #include "esp_system.h"
 #include "node_config.h"
 #include "vendor_model.h"
@@ -68,15 +69,27 @@ extern esp_ble_mesh_model_op_t op_vendor[];
 extern void vendor_model_cb(esp_ble_mesh_model_cb_event_t event,
                             esp_ble_mesh_model_cb_param_t *param);
 
-static uint16_t vendor_app_idx = APP_IDX;
+// static uint16_t vendor_app_idx = APP_IDX;
+static esp_ble_mesh_model_pub_t vendor_model_pub = {0};
 
 esp_ble_mesh_model_t vendor_models[] = {
     ESP_BLE_MESH_VENDOR_MODEL(CID_ESP, VENDOR_MODEL_ID, op_vendor,
-                              vendor_model_cb, NULL, &vendor_app_idx),
+                              &vendor_model_pub, NULL),
 };
 
+// static esp_ble_mesh_elem_t elements[] = {
+//   ESP_BLE_MESH_ELEMENT(0, 0, NULL),
+// ESP_BLE_MESH_ELEMENT(0, ARRAY_SIZE(vendor_models), vendor_models),
+//};
+
 static esp_ble_mesh_elem_t elements[] = {
-    ESP_BLE_MESH_ELEMENT(0, ARRAY_SIZE(vendor_models), vendor_models),
+    {
+        .location = 0,
+        .sig_model_count = 0,
+        .sig_models = NULL,
+        .vnd_model_count = ARRAY_SIZE(vendor_models),
+        .vnd_models = vendor_models,
+    },
 };
 
 static esp_ble_mesh_comp_t composition = {

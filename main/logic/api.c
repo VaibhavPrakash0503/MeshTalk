@@ -70,8 +70,8 @@ void api_on_message_received(const MeshMessage *m) {
   // --- Normal chat message ---
   int idx = user_table_find_index_by_addr(sender_addr);
   if (idx >= 0) {
-    if (g_app_state.selected_user == 0x0000 ||
-        g_app_state.selected_user != sender_addr) {
+    if (g_app_state.selected_user[0] == '\0' ||
+        strcmp(g_app_state.selected_user, sender_name) != 0) {
       g_app_state.new_message_flags[idx] = true; // mark new message
     }
   }
