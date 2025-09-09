@@ -239,6 +239,7 @@ void joystick_force_calibrate(void) {
            joystick_threshold_y_low, joystick_threshold_y_high);
   ESP_LOGI(TAG, "🕹️ Test your movements now!");
 }
+
 joystick_action_t joystick_get_action(void) {
   TickType_t current_time = xTaskGetTickCount();
 
@@ -277,6 +278,14 @@ joystick_action_t joystick_get_action(void) {
   }
 
   if (action != JOY_NONE) {
+    last_action_time = current_time;
+  }
+  if (action != JOY_NONE) {
+    ESP_LOGI("JOYSTICK",
+             "Action detected: %d (UP=1, DOWN=2, LEFT=3, RIGHT=4, BTN=5)",
+             action);
+    ESP_LOGI(TAG, "Raw ADC: X=%d (center=%d), Y=%d (center=%d)", x,
+             joystick_center_x, y, joystick_center_y);
     last_action_time = current_time;
   }
 

@@ -31,7 +31,6 @@ static int message_count = 0;
 void ui_init(void) {
   ESP_LOGI(TAG, "Initializing MeshTalk UI...");
 
-  display_init();
   api_init(ui_on_message_received);
 
   // Use app_state for initial screen
@@ -61,6 +60,39 @@ void ui_set_screen(screen_t screen) {
   }
 
   ESP_LOGI(TAG, "Screen changed to: %d", screen);
+}
+
+void ui_check_broadcast_timeout(void) {
+  // Check if we're in broadcast mode
+  if (app_state_get_screen() != SCREEN_BROADCAST ||
+      !ui_internal.broadcast_active) {
+    return;
+  }
+
+  // Calculate elapsed time since broadcast started
+  int64_t elapsed_ms =
+      (esp_timer_get_time() - ui_internal.broadcast_start_time) / 1000;
+
+  // Check if timeout has been reached
+  if (elapsed_ms > UI_BROADCAST_TIMEOUT_MS) {
+    // Timeout reached - stop broadcast and return to home
+    ui_internal.broadcast_active = false;
+    ui_set_screen(SCREEN_HOME);
+    ESP_LOGI(TAG, "Broadcast timeout after %lld ms - returning to home",
+             elapsed_ms);
+  }
+}
+
+// Also add the missing ui_start_broadcast() function
+void ui_start_broadcast(void) {
+  ui_internal.broadcast_active = true;
+  ui_internal.broadcast_start_time = esp_timer_get_time();
+
+  ESP_LOGI(TAG, "Starting broadcast mode with %d ms timeout",
+           UI_BROADCAST_TIMEOUT_MS);
+
+  // The broadcast screen will be shown by ui_set_screen call in
+  // ui_select_current_item
 }
 
 void ui_go_back(void) {
@@ -219,19 +251,6 @@ void ui_show_broadcast_screen(void) {
 }
 
 void ui_update(void) {
-  // Check broadcast timeout
-  if (app_state_get_screen() == SCREEN_BROADCAST &&
-      ui_internal.broadcast_active) {
-    int64_t elapsed_ms =
-        (esp_timer_get_time() - ui_internal.broadcast_start_time) / 1000;
-    if (elapsed_ms > UI_BROADCAST_TIMEOUT_MS) {
-      ui_internal.broadcast_active = false;
-      ui_set_screen(SCREEN_HOME);
-      ESP_LOGI(TAG, "Broadcast timeout - returning to home");
-      return;
-    }
-  }
-
   if (!ui_internal.screen_needs_update)
     return;
 
@@ -364,7 +383,9 @@ void ui_handle_joystick(joystick_action_t action) {
   case JOY_DOWN:
     ui_navigate_down();
     break;
-  case JOY_LEFT: // Go back
+  case JOY_LEFT:
+    ESP_LOGI(TAG, "LEFT detected - going back from screen %d",
+             app_state_get_screen()); // Go back
     ui_go_back();
     break;
   case JOY_RIGHT:

@@ -1,6 +1,6 @@
 idf_component_register(
   SRCS 
-    "MeshTalk.c"
+    "main.c"
     "core/crc16.c"
     "core/binary_serial.c"
     "core/node_config.c"

@@ -1,5 +1,4 @@
 #include "display.h"
-#include "driver/i2c.h"
 #include "ssd1306.h"
 #include <string.h>
 
@@ -21,6 +20,7 @@ static esp_err_t safe_ssd1306_display_text(int page, const char *text,
   esp_err_t ret = ESP_FAIL;
   if (xSemaphoreTake(display_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
     ssd1306_display_text(&dev, page, text, len, invert);
+    ret = ESP_OK;
     xSemaphoreGive(display_mutex);
   } else {
     ESP_LOGW(TAG, "Display mutex timeout");
@@ -32,42 +32,12 @@ static esp_err_t safe_ssd1306_clear_screen(bool invert) {
   esp_err_t ret = ESP_FAIL;
   if (xSemaphoreTake(display_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
     ssd1306_clear_screen(&dev, invert);
+    ret = ESP_OK;
     xSemaphoreGive(display_mutex);
   } else {
     ESP_LOGW(TAG, "Display mutex timeout on clear");
   }
   return ret;
-}
-
-// ✅ True large font simulation (double-height)
-static void draw_large_text(int start_page, const char *text, bool invert) {
-  // Draw on two consecutive pages for double height effect
-  safe_ssd1306_display_text(start_page, text, strlen(text), invert);
-  safe_ssd1306_display_text(start_page + 1, text, strlen(text), invert);
-}
-
-// I2C initialization (same as before)
-static esp_err_t i2c_master_init_display(void) {
-  i2c_config_t conf = {
-      .mode = I2C_MODE_MASTER,
-      .sda_io_num = I2C_MASTER_SDA_IO,
-      .sda_pullup_en = GPIO_PULLUP_ENABLE,
-      .scl_io_num = I2C_MASTER_SCL_IO,
-      .scl_pullup_en = GPIO_PULLUP_ENABLE,
-      .master.clk_speed = I2C_MASTER_FREQ_HZ,
-  };
-
-  esp_err_t err = i2c_param_config(I2C_MASTER_NUM, &conf);
-  if (err != ESP_OK)
-    return err;
-
-  err = i2c_driver_install(I2C_MASTER_NUM, conf.mode, 0, 0, 0);
-  if (err != ESP_OK)
-    return err;
-
-  ESP_LOGI(TAG, "✅ I2C initialized: SDA=%d, SCL=%d", I2C_MASTER_SDA_IO,
-           I2C_MASTER_SCL_IO);
-  return ESP_OK;
 }
 
 void display_init(void) {
@@ -80,13 +50,14 @@ void display_init(void) {
     return;
   }
 
-  if (i2c_master_init_display() != ESP_OK) {
-    ESP_LOGE(TAG, "❌ Failed to initialize I2C bus");
-    return;
-  }
+  // Let SSD1306 library handle all I2C initialization (ESP-IDF v5+ compatible)
+  ESP_LOGI(
+      TAG,
+      "Using SSD1306 library I2C initialization (ESP-IDF v5+ compatible)...");
 
+  // Initialize SSD1306 - library handles I2C setup automatically
   i2c_master_init(&dev, I2C_MASTER_SDA_IO, I2C_MASTER_SCL_IO, -1);
-  ESP_LOGI(TAG, "✅ SSD1306 I2C initialized");
+  ESP_LOGI(TAG, "✅ SSD1306 I2C initialized by library");
 
   ssd1306_init(&dev, DISPLAY_WIDTH, DISPLAY_HEIGHT);
   ESP_LOGI(TAG, "✅ SSD1306 display initialized");
@@ -97,13 +68,12 @@ void display_init(void) {
   memset(line_has_cursor, false, sizeof(line_has_cursor));
 
   display_initialized = true;
-  ESP_LOGI(TAG, "✅ SSD1306 display initialized with thread safety");
+  ESP_LOGI(TAG, "✅ SSD1306 display ready for MeshTalk");
 }
 
 void display_clear(void) {
   if (!display_initialized)
     return;
-
   safe_ssd1306_clear_screen(false);
   memset(current_lines, 0, sizeof(current_lines));
   memset(line_has_cursor, false, sizeof(line_has_cursor));
@@ -119,15 +89,13 @@ void display_set_mode(display_mode_t mode) {
 
 display_mode_t display_get_mode(void) { return current_mode; }
 
-// ✅ TEXT ALIGNMENT HELPERS
+// ✅ TEXT ALIGNMENT HELPERS - Normal font only
 void display_center_text(int line, const char *text, bool large_font) {
   if (!display_initialized || line < 0 || line >= MAX_DISPLAY_LINES)
     return;
-
   int text_len = strlen(text);
   if (text_len > MAX_CHARS_PER_LINE)
     text_len = MAX_CHARS_PER_LINE;
-
   int padding = (MAX_CHARS_PER_LINE - text_len) / 2;
   char centered_text[MAX_CHARS_PER_LINE + 1];
 
@@ -136,13 +104,8 @@ void display_center_text(int line, const char *text, bool large_font) {
   memcpy(centered_text + padding, text, text_len);
   centered_text[padding + text_len] = '\0';
 
-  // Draw with appropriate font
-  if (large_font && line <= 3) {
-    draw_large_text(line * 2, centered_text, false);
-  } else {
-    safe_ssd1306_display_text(line, centered_text, strlen(centered_text),
-                              false);
-  }
+  // Always use normal font
+  safe_ssd1306_display_text(line, centered_text, strlen(centered_text), false);
 
   // Update tracking
   strncpy(current_lines[line], centered_text, MAX_CHARS_PER_LINE);
@@ -152,38 +115,35 @@ void display_left_text(int line, const char *text, bool large_font) {
   if (!display_initialized || line < 0 || line >= MAX_DISPLAY_LINES)
     return;
 
-  // Draw with appropriate font
-  if (large_font && line <= 3) {
-    draw_large_text(line * 2, text, false);
-  } else {
-    safe_ssd1306_display_text(line, text, strlen(text), false);
-  }
+  // Always use normal font
+  safe_ssd1306_display_text(line, text, strlen(text), false);
 
   // Update tracking
   strncpy(current_lines[line], text, MAX_CHARS_PER_LINE);
 }
 
-// ✅ IMPROVED MENU FUNCTIONS (True large font)
+// ✅ MENU FUNCTIONS - Normal font
 void display_menu_line_large(int line, const char *text, bool has_cursor) {
-  if (!display_initialized || line < 0 || line > 3)
+  if (!display_initialized || line < 0 ||
+      line > 7) // Allow more lines since we use normal font
     return;
-
   char display_text[MAX_CHARS_PER_LINE + 1];
 
   // Add cursor prefix if needed
   if (has_cursor) {
     snprintf(display_text, sizeof(display_text), "> %s", text);
-    draw_large_text(line * 2, display_text, true); // Inverted for selection
+    // Use normal font with invert for selection
+    safe_ssd1306_display_text(line, display_text, strlen(display_text), true);
   } else {
     snprintf(display_text, sizeof(display_text), "  %s", text);
-    draw_large_text(line * 2, display_text, false);
+    // Use normal font
+    safe_ssd1306_display_text(line, display_text, strlen(display_text), false);
   }
 
   // Update tracking
   strncpy(current_lines[line], display_text, MAX_CHARS_PER_LINE);
   line_has_cursor[line] = has_cursor;
-
-  ESP_LOGD(TAG, "Large menu line %d: %s %s", line, text,
+  ESP_LOGD(TAG, "Menu line %d: %s %s", line, text,
            has_cursor ? "[CURSOR]" : "");
 }
 
@@ -191,14 +151,14 @@ void display_show_menu_screen(const char *title, const char *menu_items[],
                               int item_count, int cursor_pos) {
   if (!display_initialized)
     return;
-
   display_clear();
 
-  // Line 0: Centered title (large font, no cursor)
-  display_center_text(0, title, true);
+  // Line 0: Centered title (normal font)
+  display_center_text(0, title, false);
 
-  // Lines 1-3: Menu items (large font with cursor)
-  int max_items = (item_count > 3) ? 3 : item_count;
+  // Lines 1+: Menu items (normal font with cursor)
+  int max_items =
+      (item_count > 6) ? 6 : item_count; // More items fit with normal font
   for (int i = 0; i < max_items; i++) {
     bool has_cursor = (i == cursor_pos);
     display_menu_line_large(i + 1, menu_items[i], has_cursor);
@@ -208,11 +168,10 @@ void display_show_menu_screen(const char *title, const char *menu_items[],
            cursor_pos);
 }
 
-// ✅ LIST FUNCTIONS (Small font, optimized)
+// ✅ LIST FUNCTIONS (Normal font, optimized)
 void display_list_line(int line, const char *text, bool has_cursor) {
   if (!display_initialized || line < 0 || line >= MAX_DISPLAY_LINES)
     return;
-
   char display_text[MAX_CHARS_PER_LINE + 1];
 
   // Add cursor prefix if needed
@@ -234,7 +193,6 @@ void display_show_list_screen(const char *title, const char *list_items[],
                               int scroll_offset) {
   if (!display_initialized)
     return;
-
   display_clear();
 
   // Line 0: Centered title
@@ -260,7 +218,6 @@ void display_show_chat_screen(const char *contact_name, const char *messages[],
                               int msg_count, int scroll_offset) {
   if (!display_initialized)
     return;
-
   display_clear();
 
   // Line 0: Centered contact name
@@ -297,8 +254,7 @@ void display_move_cursor(int old_line, int new_line) {
     } else {
       strncpy(text_only, src, MAX_CHARS_PER_LINE);
     }
-
-    if (current_mode == DISPLAY_MODE_MENU && old_line <= 3) {
+    if (current_mode == DISPLAY_MODE_MENU && old_line <= 7) {
       display_menu_line_large(old_line, text_only, false);
     } else {
       display_list_line(old_line, text_only, false);
@@ -315,8 +271,7 @@ void display_move_cursor(int old_line, int new_line) {
     } else {
       strncpy(text_only, src, MAX_CHARS_PER_LINE);
     }
-
-    if (current_mode == DISPLAY_MODE_MENU && new_line <= 3) {
+    if (current_mode == DISPLAY_MODE_MENU && new_line <= 7) {
       display_menu_line_large(new_line, text_only, true);
     } else {
       display_list_line(new_line, text_only, true);
