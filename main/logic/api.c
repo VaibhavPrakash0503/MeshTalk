@@ -2,6 +2,7 @@
 #include "app_state.h"
 #include "chat_log.h"
 #include "constants.h"
+#include "esp_log.h"
 #include "esp_log_timestamp.h"
 #include "esp_timer.h"
 #include "message_handler.h"
@@ -16,6 +17,8 @@
 // Keep UI callback pointer
 static ui_receive_cb_t ui_cb = NULL;
 
+static const char *TAG = "API";
+
 /**
  * Initialize API and register UI callback.
  */
@@ -26,6 +29,7 @@ void api_init(ui_receive_cb_t cb) { ui_cb = cb; }
  */
 void api_send_text(const char *receiver_name, const char *msg) {
 
+  ESP_LOGI(TAG, "Message recieved from UI");
   int idx = user_table_find_index_by_name(receiver_name);
   if (idx >= 0) {
     chat_log_add(idx, msg, true); // true = outgoing
@@ -49,6 +53,7 @@ void api_send_text(const char *receiver_name, const char *msg) {
   memcpy(m.payload, msg, msg_len);
 
   uint16_t receiver_add = user_table_get_addr(receiver_name);
+  ESP_LOGI(TAG, "Structured message sent to message handler");
 
   message_handler_send(&m, receiver_add);
 }
@@ -58,13 +63,23 @@ void api_send_text(const char *receiver_name, const char *msg) {
  * Converts MeshMessage → (sender_id, text) → UI callback.
  */
 void api_on_message_received(const MeshMessage *m) {
+
+  const node_config_t *cfg = node_config_get();
+
+  ESP_LOGI(TAG, "Structured message recieved from message handler");
+  if (m->addr == cfg->address) {
+    ESP_LOGI(TAG, "Ignoring self-message from address 0x%04X", m->addr);
+    return;
+  }
   uint16_t sender_addr = m->addr;
   const char *sender_name = m->sender_name;
 
   // --- Handle broadcast messages ---
   if (m->type == 2) {                         // 2 = broadcast
     user_table_set(sender_name, sender_addr); // add/update user table
-    return;                                   // no further processing needed
+
+    ESP_LOGI(TAG, "Brodcast recieved");
+    return; // no further processing needed
   }
 
   // --- Normal chat message ---
@@ -90,9 +105,12 @@ void api_on_message_received(const MeshMessage *m) {
     chat_log_add(idx, buffer, false);
   }
 
+  ESP_LOGI(TAG, "message stored");
   // 2. Notify UI if registered
   if (ui_cb) {
     ui_cb(sender_name, buffer);
+
+    ESP_LOGI(TAG, "message sent to UI");
   }
 }
 
@@ -111,8 +129,6 @@ void api_broadcast_addr(void) {
 }
 
 int api_get_contact_names(char names[][USERNAME_MAX_LEN], int max_contacts) {
-  if (!names || max_contacts <= 0)
-    return 0;
 
   int count = 0;
   for (int i = 0; i < MAX_USERS && count < max_contacts; i++) {

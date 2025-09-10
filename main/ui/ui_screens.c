@@ -131,6 +131,7 @@ void ui_show_home_screen(void) {
 // CHAT LIST SCREEN with new message indicators
 void ui_show_chat_screen(void) {
   contact_count = api_get_contact_names(contact_list, MAX_USERS);
+  ESP_LOGI(TAG, "Count %d", contact_count);
 
   if (contact_count == 0) {
     const char *empty_list[] = {"No contacts found"};

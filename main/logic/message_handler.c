@@ -8,6 +8,7 @@
 
 static app_receive_cb_t app_receive_cb = NULL; // app-level callback
 
+static const char *TAG = "Message_handler";
 /**
  * @brief Initialize message handler and hook into mesh
  */
@@ -20,6 +21,8 @@ void message_handler_init(void) {
  * @brief Called by mesh.c whenever a raw buffer arrives
  */
 void message_handler_receive_raw(const uint8_t *data, size_t len) {
+
+  ESP_LOGI(TAG, "Message recieved from Mesh");
   if (!data || len < 3) {
     return;
   }
@@ -27,8 +30,9 @@ void message_handler_receive_raw(const uint8_t *data, size_t len) {
   MeshMessage msg;
   int ret = message_handler_process_incoming(data, len, &msg);
   if (ret == 0) {
-    // Pass processed message to application logic/UI
+    // Pass processed message to application Api
     if (app_receive_cb) {
+      ESP_LOGI(TAG, "Message sent to API");
       app_receive_cb(&msg);
     }
   }
@@ -41,6 +45,7 @@ void message_handler_receive_raw(const uint8_t *data, size_t len) {
  */
 int message_handler_process_incoming(const uint8_t *data, size_t len,
                                      MeshMessage *out_msg) {
+
   if (!data || len < 3 || !out_msg) {
     return -1;
   }
@@ -59,8 +64,7 @@ int message_handler_process_incoming(const uint8_t *data, size_t len,
   if (ret != 0) {
     return -3;
   }
-
-  printf("Message received");
+  ESP_LOGI(TAG, "incoming message handled success");
   return 0;
 }
 
@@ -71,6 +75,8 @@ int message_handler_process_incoming(const uint8_t *data, size_t len,
  * - Forward to mesh.c
  */
 int message_handler_send(const MeshMessage *msg, uint16_t receiver_add) {
+
+  ESP_LOGI(TAG, "Message recieved from API");
   if (!msg) {
     return -1;
   }
@@ -89,11 +95,14 @@ int message_handler_send(const MeshMessage *msg, uint16_t receiver_add) {
   buffer[buffer_len++] = (crc >> 8) & 0xFF;
   buffer[buffer_len++] = crc & 0xFF;
 
+  ESP_LOGI(TAG, "Message send to mesh");
   // Pass to mesh for transport
   return mesh_send_raw(buffer, buffer_len, receiver_add);
 }
 
 void message_handler_broadcast(MeshMessage *msg) {
+
+  ESP_LOGI(TAG, "Broadcast recieved from API");
 
   uint8_t buffer[sizeof(MeshMessage) + 4];
   size_t buffer_len = 0;

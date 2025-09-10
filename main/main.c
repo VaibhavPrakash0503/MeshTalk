@@ -13,6 +13,7 @@
 #include "nvs_flash.h"
 
 // --- Project includes ---
+#include "api.h"
 #include "app_state.h"       // app_state_init()
 #include "display.h"         // display_init()
 #include "joystick.h"        // joystick_init()
@@ -65,6 +66,9 @@ static esp_err_t app_layer_init(void) {
 
   message_handler_init();
   ESP_LOGI(TAG, "Message handler ready");
+
+  message_handler_register_app_cb(api_on_message_received);
+  ESP_LOGI(TAG, "API callback registered with message handler");
 
   return ESP_OK;
 }

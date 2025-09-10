@@ -1,7 +1,10 @@
 #include "node_config.h"
+#include "esp_log.h"
 #include <string.h>
 
 static node_config_t node_cfg;
+
+static const char *TAG = "Node";
 
 void node_config_init(const char *name) {
   memset(&node_cfg, 0, sizeof(node_cfg));
@@ -9,6 +12,9 @@ void node_config_init(const char *name) {
   node_cfg.address = 0x0000; // not yet provisioned
 }
 
-void node_config_set_address(uint16_t addr) { node_cfg.address = addr; }
+void node_config_set_address(uint16_t addr) {
+  node_cfg.address = addr;
+  ESP_LOGI(TAG, "Node Address added to node_cfg");
+}
 
 const node_config_t *node_config_get(void) { return &node_cfg; }
