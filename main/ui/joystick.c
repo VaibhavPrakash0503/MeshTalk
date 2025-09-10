@@ -22,13 +22,12 @@ static int y_history[FILTER_SAMPLES] = {0};
 static int filter_index = 0;
 
 // Calibrated values
-int32_t joystick_center_x = 2048;
-int32_t joystick_center_y = 2048;
-int32_t joystick_threshold_x_low = 1500;
-int32_t joystick_threshold_x_high = 2500;
-int32_t joystick_threshold_y_low = 1500;
-int32_t joystick_threshold_y_high = 2500;
-
+int32_t joystick_center_x = 2041;
+int32_t joystick_center_y = 1931;
+int32_t joystick_threshold_x_low = 1427;
+int32_t joystick_threshold_x_high = 2655;
+int32_t joystick_threshold_y_low = 1317;
+int32_t joystick_threshold_y_high = 2545;
 // Debounce
 static volatile TickType_t last_action_time = 0;
 static const TickType_t DEBOUNCE_DELAY = pdMS_TO_TICKS(200);
@@ -154,14 +153,14 @@ void joystick_init(void) {
 
   // Rest of initialization remains the same...
   last_action_time = xTaskGetTickCount();
-  bool need_calibration = !load_calibration();
-  if (!need_calibration) {
-    need_calibration = calibration_requested();
-  }
-  if (need_calibration) {
-    joystick_force_calibrate();
-    save_calibration();
-  }
+  // bool need_calibration = !load_calibration();
+  // if (!need_calibration) {
+  // need_calibration = calibration_requested();
+  //}
+  // if (need_calibration) {
+  // joystick_force_calibrate();
+  // save_calibration();
+  //}
   ESP_LOGI(TAG, "✅ MeshTalk joystick ready!");
 }
 

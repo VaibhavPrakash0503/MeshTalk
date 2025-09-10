@@ -45,23 +45,53 @@ void mesh_vendor_model_cb(esp_ble_mesh_model_cb_event_t event,
 /* -------------------------------------------------------------------------- */
 /*                            Message sending                                 */
 /* -------------------------------------------------------------------------- */
+// int mesh_send_raw(const uint8_t *data, size_t data_len, uint16_t
+// receiver_add) {
+//   if (data_len == 0) {
+//     ESP_LOGE(TAG, "Invalid arguments to mesh_send_raw");
+//     return -1;
+//   }
+//
+//   esp_ble_mesh_msg_ctx_t ctx = {0};
+//   ctx.net_idx = NET_IDX;
+//   ctx.app_idx = APP_IDX;
+//   ctx.addr = receiver_add;
+//   ctx.send_ttl = 5;
+//
+//   esp_err_t err = esp_ble_mesh_client_model_send_msg(
+//       &vendor_models[0], &ctx, VENDOR_OPCODE_MESSAGE, data_len, (uint8_t
+//       *)data, 2000, // timeout true, // need response ROLE_NODE);
+//
+//   if (err != ESP_OK) {
+//     ESP_LOGE(TAG, "Send failed (err=0x%04X)", err);
+//     return -1;
+//   }
+//
+//   ESP_LOGI(TAG, "Raw message sent to 0x%04X, len=%u", receiver_add,
+//            (unsigned)data_len);
+//   return 0;
+// }
+
 int mesh_send_raw(const uint8_t *data, size_t data_len, uint16_t receiver_add) {
+  if (!is_provisioned()) {
+    ESP_LOGE(TAG, "❌ Not provisioned - cannot send message");
+    return -1;
+  }
+
   if (data_len == 0) {
     ESP_LOGE(TAG, "Invalid arguments to mesh_send_raw");
     return -1;
   }
 
   esp_ble_mesh_msg_ctx_t ctx = {0};
-  ctx.net_idx = NET_IDX;
-  ctx.app_idx = APP_IDX;
+  ctx.net_idx = get_net_idx(); // Use mobile provisioning info
+  ctx.app_idx = get_app_idx(); // Use mobile provisioning info
   ctx.addr = receiver_add;
   ctx.send_ttl = 5;
 
   esp_err_t err = esp_ble_mesh_client_model_send_msg(
       &vendor_models[0], &ctx, VENDOR_OPCODE_MESSAGE, data_len, (uint8_t *)data,
-      2000, // timeout
-      true, // need response
-      ROLE_NODE);
+      2000, true, ROLE_NODE);
 
   if (err != ESP_OK) {
     ESP_LOGE(TAG, "Send failed (err=0x%04X)", err);
@@ -73,15 +103,45 @@ int mesh_send_raw(const uint8_t *data, size_t data_len, uint16_t receiver_add) {
   return 0;
 }
 
+// bool mesh_broadcast_self(const uint8_t *buffer, size_t buffer_len) {
+//   if (!buffer || buffer_len == 0) {
+//     ESP_LOGE("MESH", "Invalid buffer or buffer length");
+//     return false;
+//   }
+//
+//   esp_ble_mesh_msg_ctx_t ctx = {0};
+//   ctx.net_idx = NET_IDX;
+//   ctx.app_idx = APP_IDX;
+//   ctx.addr = 0xFFFF;
+//   ctx.send_ttl = 5;
+//
+//   esp_err_t err = esp_ble_mesh_server_model_send_msg(
+//       &vendor_models[0], &ctx, VENDOR_OPCODE_MESSAGE, (uint16_t)buffer_len,
+//       (uint8_t *)buffer);
+//
+//   if (err != ESP_OK) {
+//     ESP_LOGE("MESH", "Broadcast failed (err=0x%X)", err);
+//     return false;
+//   }
+//
+//   ESP_LOGI("MESH", "📢 Broadcasted self (%d bytes)", buffer_len);
+//   return true;
+// }
+
 bool mesh_broadcast_self(const uint8_t *buffer, size_t buffer_len) {
+  if (!is_provisioned()) {
+    ESP_LOGE("MESH", "❌ Not provisioned - cannot broadcast");
+    return false;
+  }
+
   if (!buffer || buffer_len == 0) {
     ESP_LOGE("MESH", "Invalid buffer or buffer length");
     return false;
   }
 
   esp_ble_mesh_msg_ctx_t ctx = {0};
-  ctx.net_idx = NET_IDX;
-  ctx.app_idx = APP_IDX;
+  ctx.net_idx = get_net_idx(); // Use mobile provisioning info
+  ctx.app_idx = get_app_idx(); // Use mobile provisioning info
   ctx.addr = 0xFFFF;
   ctx.send_ttl = 5;
 
@@ -97,7 +157,6 @@ bool mesh_broadcast_self(const uint8_t *buffer, size_t buffer_len) {
   ESP_LOGI("MESH", "📢 Broadcasted self (%d bytes)", buffer_len);
   return true;
 }
-
 /* -------------------------------------------------------------------------- */
 /*                  Register callback for higher-level app                    */
 /* -------------------------------------------------------------------------- */

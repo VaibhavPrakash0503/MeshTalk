@@ -104,8 +104,6 @@ void app_main(void) {
     return;
   }
 
-  ESP_LOGI("MAIN", "Forcing joystick calibration...");
-  joystick_force_calibrate();
   // Step 3: App layer
   if (app_layer_init() != ESP_OK) {
     ESP_LOGE(TAG, "App layer init failed!");
@@ -120,6 +118,8 @@ void app_main(void) {
   // Step 5: Mesh networking
   mesh_init();
   ESP_LOGI(TAG, "Mesh network initialized");
+
+  check_provisioning_status();
 
   // Step 6: System monitor
   xTaskCreate(system_monitor_task, "sys_monitor", 2048, NULL, 1, NULL);

@@ -42,6 +42,13 @@ void mesh_init(void);
 void provisioning_cb(esp_ble_mesh_prov_cb_event_t event,
                      esp_ble_mesh_prov_cb_param_t *param);
 
+void check_provisioning_status(void);
+
+uint16_t get_net_idx(void);
+uint16_t get_app_idx(void);
+uint16_t get_node_addr(void);
+bool is_provisioned(void);
+
 #ifdef __cplusplus
 }
 #endif
