@@ -3,6 +3,7 @@
 #include "esp_log.h"
 #include "mesh_init.h"
 #include "vendor_model.h"
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -63,9 +64,9 @@ int mesh_send_raw(const uint8_t *data, size_t data_len, uint16_t receiver_add) {
   ctx.addr = receiver_add;
   ctx.send_ttl = 5;
 
-  esp_err_t err = esp_ble_mesh_client_model_send_msg(
-      &vendor_models[0], &ctx, VENDOR_OPCODE_MESSAGE, data_len, (uint8_t *)data,
-      2000, true, ROLE_NODE);
+  esp_err_t err = esp_ble_mesh_server_model_send_msg(
+      &vendor_models[0], &ctx, VENDOR_OPCODE_MESSAGE, (uint16_t)data_len,
+      (uint8_t *)data);
 
   if (err != ESP_OK) {
     ESP_LOGE(TAG, "Send failed (err=0x%04X)", err);

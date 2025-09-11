@@ -21,7 +21,7 @@ void chat_log_add(int user_idx, const char *msg, bool outgoing) {
 
   user_chat_log_t *log = &chat_logs[user_idx];
   if (outgoing) {
-    snprintf(log->messages[log->head], MAX_MESSAGE_LEN, "[You] %s", msg);
+    snprintf(log->messages[log->head], MAX_MESSAGE_LEN, "[Y] %s", msg);
   } else {
     strncpy(log->messages[log->head], msg, MAX_MESSAGE_LEN);
     log->messages[log->head][MAX_MESSAGE_LEN - 1] =

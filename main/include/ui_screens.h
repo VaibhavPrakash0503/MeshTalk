@@ -39,6 +39,7 @@ void ui_show_chat_screen(void);
 void ui_show_individual_chat_screen(const char *contact_name);
 void ui_show_send_message_screen(void);
 void ui_show_broadcast_screen(void);
+void ui_show_about_screen();
 
 // Navigation helpers
 void ui_navigate_up(void);
@@ -64,4 +65,3 @@ void ui_check_broadcast_timeout(void);
 // Utility functions
 const char *ui_get_predefined_message(int index);
 int ui_get_predefined_message_count(void);
-

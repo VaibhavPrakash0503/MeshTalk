@@ -5,6 +5,7 @@
 #include "display.h"
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "node_config.h"
 #include "types_common.h"
 #include "user_table.h"
 #include <string.h>
@@ -102,6 +103,9 @@ void ui_go_back(void) {
   case SCREEN_CHAT:
     ui_set_screen(SCREEN_HOME);
     break;
+  case SCREEN_ABOUT:
+    ui_set_screen(SCREEN_HOME);
+    break;
   case SCREEN_INDIVIDUAL_CHAT:
     ui_set_screen(SCREEN_CHAT);
     break;
@@ -120,12 +124,40 @@ screen_t ui_get_current_screen(void) { return app_state_get_screen(); }
 
 // HOME SCREEN (Menu mode)
 void ui_show_home_screen(void) {
-  const char *menu_items[] = {"Chat", "Broadcast"};
+  const char *menu_items[] = {"Chat", "Broadcast", "About"};
 
   display_set_mode(DISPLAY_MODE_MENU);
-  display_show_menu_screen("MeshTalk", menu_items, 2, ui_internal.cursor_pos);
+  display_show_menu_screen("MeshTalk", menu_items, 3, ui_internal.cursor_pos);
 
   ESP_LOGD(TAG, "Home screen displayed, cursor at %d", ui_internal.cursor_pos);
+}
+
+void ui_show_about_screen(void) {
+  display_set_mode(DISPLAY_MODE_MENU);
+  display_clear();
+
+  // Title
+  display_center_text(0, "About", false);
+  display_list_line(1, "MeshTalk v1.1", false);
+
+  // Node name from your node_config
+  const node_config_t *config = node_config_get();
+  if (config && strlen(config->name) > 0) {
+    char node_info[64];
+    snprintf(node_info, sizeof(node_info), "Name: %s", config->name);
+    display_list_line(2, node_info, false);
+  } else {
+    display_list_line(2, "Node: Unknown", false);
+  }
+
+  // Node address
+  if (config) {
+    char addr_info[32];
+    snprintf(addr_info, sizeof(addr_info), "Addr: 0x%04X", config->address);
+    display_list_line(3, addr_info, false);
+  }
+
+  ESP_LOGD(TAG, "About screen displayed");
 }
 
 // CHAT LIST SCREEN with new message indicators
@@ -221,7 +253,7 @@ void ui_show_send_message_screen(void) {
   // Header
   char header[32];
   const char *selected_user = app_state_get_selected_user();
-  snprintf(header, sizeof(header), "Send to %s", selected_user);
+  snprintf(header, sizeof(header), "%s", selected_user);
   display_center_text(0, header, false);
 
   // Show message options (lines 1-7)
@@ -272,6 +304,9 @@ void ui_update(void) {
   case SCREEN_BROADCAST:
     ui_show_broadcast_screen();
     break;
+  case SCREEN_ABOUT:
+    ui_show_about_screen();
+    break;
   }
 
   ui_internal.screen_needs_update = false;
@@ -290,7 +325,7 @@ void ui_navigate_down(void) {
 
   switch (current) {
   case SCREEN_HOME:
-    max_pos = 1; // Chat, Broadcast
+    max_pos = 2; // Chat, Broadcast, About
     break;
   case SCREEN_CHAT:
     max_pos = contact_count - 1;
@@ -303,6 +338,9 @@ void ui_navigate_down(void) {
     break;
   case SCREEN_BROADCAST: // Handle broadcast case
     max_pos = 0;         // No navigation during broadcast
+    break;
+  case SCREEN_ABOUT:
+    max_pos = 0;
     break;
   default: // Add default case to fix clangd error
     ESP_LOGW(TAG, "Unknown screen in navigate_down: %d", current);
@@ -328,6 +366,8 @@ void ui_select_current_item(void) {
       ui_internal.broadcast_active = true;
       ui_internal.broadcast_start_time = esp_timer_get_time();
       ui_set_screen(SCREEN_BROADCAST);
+    } else if (ui_internal.cursor_pos == 2) {
+      ui_set_screen(SCREEN_ABOUT);
     }
     break;
 
@@ -349,7 +389,8 @@ void ui_select_current_item(void) {
     ui_send_selected_message();
     break;
   case SCREEN_BROADCAST: // No user interaction during broadcast - just showing
-                         // status
+    break;
+  case SCREEN_ABOUT:
     break;
   default:
     ESP_LOGW(TAG, "Unknown screen in select_current_item: %d", current);
