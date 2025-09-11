@@ -151,16 +151,7 @@ void joystick_init(void) {
     vTaskDelay(pdMS_TO_TICKS(10));
   }
 
-  // Rest of initialization remains the same...
   last_action_time = xTaskGetTickCount();
-  // bool need_calibration = !load_calibration();
-  // if (!need_calibration) {
-  // need_calibration = calibration_requested();
-  //}
-  // if (need_calibration) {
-  // joystick_force_calibrate();
-  // save_calibration();
-  //}
   ESP_LOGI(TAG, "✅ MeshTalk joystick ready!");
 }
 
@@ -239,12 +230,11 @@ void joystick_force_calibrate(void) {
   ESP_LOGI(TAG, "🕹️ Test your movements now!");
 }
 
+static joystick_action_t last_detected_action = JOY_NONE;
+static const TickType_t COOLDOWN_DELAY = pdMS_TO_TICKS(300);
+
 joystick_action_t joystick_get_action(void) {
   TickType_t current_time = xTaskGetTickCount();
-
-  if ((current_time - last_action_time) < DEBOUNCE_DELAY) {
-    return JOY_NONE;
-  }
 
   // Read and smooth ADC values
   int raw_x, raw_y;
@@ -262,33 +252,42 @@ joystick_action_t joystick_get_action(void) {
 
   int btn = gpio_get_level(JOY_BTN_PIN);
 
-  joystick_action_t action = JOY_NONE;
+  joystick_action_t current_action = JOY_NONE;
 
   if (btn == 0) {
-    action = JOY_BTN;
+    current_action = JOY_BTN;
   } else if (y < joystick_threshold_y_low) {
-    action = JOY_UP;
+    current_action = JOY_UP;
   } else if (y > joystick_threshold_y_high) {
-    action = JOY_DOWN;
+    current_action = JOY_DOWN;
   } else if (x < joystick_threshold_x_low) {
-    action = JOY_LEFT;
+    current_action = JOY_LEFT;
   } else if (x > joystick_threshold_x_high) {
-    action = JOY_RIGHT;
+    current_action = JOY_RIGHT;
   }
 
-  if (action != JOY_NONE) {
-    last_action_time = current_time;
-  }
-  if (action != JOY_NONE) {
-    ESP_LOGI("JOYSTICK",
-             "Action detected: %d (UP=1, DOWN=2, LEFT=3, RIGHT=4, BTN=5)",
-             action);
-    ESP_LOGI(TAG, "Raw ADC: X=%d (center=%d), Y=%d (center=%d)", x,
-             joystick_center_x, y, joystick_center_y);
-    last_action_time = current_time;
+  if (current_action != last_detected_action) {
+    // Action changed - this is an edge transition
+    last_detected_action = current_action;
+
+    // Only process non-NONE actions that respect cooldown
+    if (current_action != JOY_NONE) {
+      if ((current_time - last_action_time) >= COOLDOWN_DELAY) {
+        last_action_time = current_time;
+        ESP_LOGI(TAG,
+                 "Action detected: %d (UP=1, DOWN=2, LEFT=3, RIGHT=4, BTN=5)",
+                 current_action);
+        ESP_LOGI(TAG, "Raw ADC: X=%d (center=%d), Y=%d (center=%d)", x,
+                 joystick_center_x, y, joystick_center_y);
+        return current_action;
+      } else {
+        ESP_LOGD(TAG, "Action blocked by cooldown");
+        return JOY_NONE;
+      }
+    }
   }
 
-  return action;
+  return JOY_NONE;
 }
 
 bool joystick_is_calibrated(void) {
