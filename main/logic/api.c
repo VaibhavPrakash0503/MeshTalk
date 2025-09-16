@@ -82,8 +82,27 @@ void api_on_message_received(const MeshMessage *m) {
     return; // no further processing needed
   }
 
-  // --- Normal chat message ---
+  // --- Handle unknown nodes for regular messages ---
   int idx = user_table_find_index_by_addr(sender_addr);
+
+  // **NEW: Auto-register unknown nodes**
+  if (idx < 0) {
+    ESP_LOGI(TAG, "Unknown node detected: %s (0x%04X) - Auto-registering",
+             sender_name, sender_addr);
+    user_table_set(sender_name, sender_addr);
+    idx = user_table_find_index_by_addr(sender_addr); // Get the new index
+
+    if (idx < 0) {
+      ESP_LOGE(TAG, "Failed to register unknown node %s (0x%04X)", sender_name,
+               sender_addr);
+      return; // Exit if registration failed
+    }
+
+    ESP_LOGI(TAG, "Successfully registered new node: %s at index %d",
+             sender_name, idx);
+  }
+
+  // --- Normal chat message ---
   if (idx >= 0) {
     if (g_app_state.selected_user[0] == '\0' ||
         strcmp(g_app_state.selected_user, sender_name) != 0) {
