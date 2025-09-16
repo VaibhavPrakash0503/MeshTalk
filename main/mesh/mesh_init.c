@@ -210,7 +210,7 @@ void mesh_init(void) {
   ESP_LOGI(TAG, "Initializing MeshTalk BLE Mesh Node");
 
   // Initialize your node config
-  node_config_init("Node_1");
+  node_config_init("Node 1");
 
   // Initialize Bluetooth stack (directly here instead of using example
   // function)

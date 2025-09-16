@@ -1,4 +1,5 @@
 #pragma once
+#include "esp_err.h"
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -39,3 +40,7 @@ void user_table_print(void);
 int user_table_find_index_by_addr(uint16_t addr);
 
 int user_table_find_index_by_name(const char *username);
+
+esp_err_t user_table_save_to_nvs(void);
+esp_err_t user_table_load_from_nvs(void);
+void user_table_clear(void);

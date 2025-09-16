@@ -21,6 +21,7 @@
 #include "message_handler.h" // message_handler_init()
 #include "ui_loop.h" // ui_loop_start(), ui_loop_is_running(), ui_print_loop_stats()
 #include "ui_screens.h" // ui_init()
+#include "user_table.h"
 
 static const char *TAG = "MAIN";
 
@@ -101,6 +102,9 @@ void app_main(void) {
 
   // Step 1: NVS
   nvs_init();
+
+  // Load user data from nvs
+  user_table_load_from_nvs();
 
   // Step 2: Hardware
   if (hardware_init() != ESP_OK) {
